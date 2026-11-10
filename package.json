@@ -3,12 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js",
     "test:browser": "node test/browser.mjs",
     "check": "node --check server.js && node --check public/app.js"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.0",
+    "prettier": "^3.9.10"
   }
 }
