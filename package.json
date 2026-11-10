@@ -7,14 +7,15 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node --env-file=.env server.js",
-    "dev": "node --env-file=.env --watch server.js",
-    "test": "node --env-file=.env --test test/*.test.js",
-    "test:browser": "node --env-file=.env test/browser.mjs",
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "test": "node --env-file-if-exists=.env --test test/*.test.js",
+    "test:browser": "node --env-file-if-exists=.env test/browser.mjs",
     "test:navigation": "node test/navigation.mjs",
     "check": "node --check server.js && node --check public/app.js",
-    "db:migrate": "node --env-file=.env scripts/migrate.js",
-    "db:check": "node --env-file=.env scripts/check-db.js"
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+    "db:init": "npm run db:migrate",
+    "db:check": "node --env-file-if-exists=.env scripts/check-db.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

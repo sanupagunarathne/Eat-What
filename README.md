@@ -2,9 +2,9 @@
 
 A warm, mobile-first group dining app. Create a table, invite your people, vote privately, and reveal a meal everyone agreed on.
 
-## Development
+## Development and database setup
 
-Requires **Node.js 24+** (see `.nvmrc`) and PostgreSQL. Room storage uses `pg`.
+Requires **Node.js 24+** (see `.nvmrc`) and PostgreSQL. Room storage uses `pg`. Create a Neon project or use local PostgreSQL, copy `.env.example` to `.env`, and replace `DATABASE_URL` with your connection string, keeping Neon's TLS parameters. Never commit credentials.
 
 ```sh
 npm ci
@@ -28,7 +28,7 @@ Click the EATWHAT logo or **Back to create room** from any room screen to return
 - **Result:** results wait until everyone has voted on every meal. A match requires a yes from every participant. When several meals match, the first in the common catalogue wins. No-match and no-meals states are explicit. Only the host can restart; a restart clears votes and readiness.
 - **Reconnect:** reloads preserve the current room and membership. Polling refreshes the shared room every 1.5 seconds, pauses in hidden tabs, and reports temporary connection loss.
 
-Rooms persist in Neon PostgreSQL. `DATABASE_URL` is required. Start, dev, migration, connection-check, and test scripts load `.env` using Node’s built-in loader. Keep Neon's TLS parameters in the URL. `.env` is ignored by Git. `npm run db:migrate` applies the idempotent `migrations/001_rooms.sql` migration and is safe to rerun. `npm run db:check` verifies connectivity without printing connection details. The server checks the rooms table before listening. Transactions and row locks preserve concurrent joins, readiness changes, and votes across server instances.
+Rooms persist in Neon PostgreSQL. `DATABASE_URL` is required. Start, dev, migration, connection-check, and test scripts load `.env` when present using Node’s built-in loader; CI and hosting can supply environment variables directly without that file. Keep Neon's TLS parameters in the URL. `.env` is ignored by Git. `npm run db:migrate` (also available as `npm run db:init`) applies the idempotent `migrations/001_rooms.sql` migration and is safe to rerun. `npm run db:check` verifies connectivity without printing connection details. The server checks the rooms table before listening. Transactions and row locks preserve concurrent joins, readiness changes, and votes across server instances.
 
 The migration creates the PostgreSQL table; it does not copy rooms from an existing `.data/eatwhat.sqlite` file. Keep that file if you need its history. For HTTPS deployments, set `COOKIE_SECURE=true`. Real restaurant discovery, geolocation, account recovery, and production abuse controls are not included.
 

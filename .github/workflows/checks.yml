@@ -7,6 +7,20 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: eatwhat
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: eatwhat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eatwhat -d eatwhat_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://eatwhat:test-only@localhost:5432/eatwhat_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,6 +30,9 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npx prettier --check .
+      - run: npm run db:check
+      - run: npm run db:migrate
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run test:navigation
