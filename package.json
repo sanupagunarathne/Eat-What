@@ -4,18 +4,24 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": "24.x"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "test": "node --test test/rooms.test.js",
     "test:browser": "node test/browser.mjs",
-    "check": "node --check server.js && node --check public/app.js"
+    "check": "node --check server.js && node --check public/app.js",
+    "db:init": "node --env-file-if-exists=.env scripts/init-db.js",
+    "build": "npm run check",
+    "test:postgres": "node --env-file-if-exists=.env --test test/postgres.test.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.0",
     "prettier": "^3.9.10"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }

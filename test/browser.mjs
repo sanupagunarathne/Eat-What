@@ -5,11 +5,19 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+if (!process.env.TEST_DATABASE_URL)
+  throw new Error(
+    "Set TEST_DATABASE_URL to an initialized, isolated PostgreSQL test database.",
+  );
 const data = mkdtempSync(join(tmpdir(), "eatwhat-browser-"));
 const port = 3107,
   base = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, ["server.js"], {
-  env: { ...process.env, PORT: String(port), DATA_DIR: data },
+  env: {
+    ...process.env,
+    PORT: String(port),
+    DATABASE_URL: process.env.TEST_DATABASE_URL,
+  },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let serverOutput = "";
