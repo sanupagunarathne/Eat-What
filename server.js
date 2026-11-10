@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import { pool as db, roomsTable } from "./db.js";
+import { pool as db, roomsTable, roomTimestamp } from "./db.js";
 import { readFileSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,7 @@ const fail = (status, message) => {
 async function store(client, room) {
   await client.query(
     `UPDATE ${roomsTable} SET data = $2, updated = $3 WHERE code = $1`,
-    [room.code, JSON.stringify(room), Date.now()],
+    [room.code, JSON.stringify(room), await roomTimestamp()],
   );
 }
 function publicRoom(room, session) {
@@ -61,7 +61,7 @@ async function body(req) {
     fail(400, "Please send a valid request.");
   }
 }
-export const server = createServer(async (req, res) => {
+export const handler = async (req, res) => {
   let client,
     transaction = false;
   const send = (status, data) => {
@@ -130,7 +130,7 @@ export const server = createServer(async (req, res) => {
           room.code = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
           const inserted = await db.query(
             `INSERT INTO ${roomsTable} (code, data, updated) VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING`,
-            [room.code, JSON.stringify(room), Date.now()],
+            [room.code, JSON.stringify(room), await roomTimestamp()],
           );
           if (inserted.rowCount) break;
         }
@@ -160,7 +160,8 @@ export const server = createServer(async (req, res) => {
           404,
           "Room not found. Check the six-character code and try again.",
         );
-      const room = JSON.parse(row.data),
+      const room =
+          typeof row.data === "string" ? JSON.parse(row.data) : row.data,
         action = match[2];
       if (!action && req.method === "GET")
         return send(200, publicRoom(room, session));
@@ -274,9 +275,13 @@ export const server = createServer(async (req, res) => {
       }
     }
   }
-});
+};
+export const server = createServer(handler);
 server.on("close", () => db.end());
-if (process.env.NODE_ENV !== "test") {
+const isMain =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain && process.env.NODE_ENV !== "test") {
   try {
     await db.query(`SELECT code FROM ${roomsTable} LIMIT 0`);
   } catch (error) {

@@ -4,7 +4,7 @@ A warm, mobile-first group dining app. Create a table, invite your people, vote 
 
 ## Development and database setup
 
-Requires **Node.js 24+** (see `.nvmrc`) and PostgreSQL. Room storage uses `pg`. Create a Neon project or use local PostgreSQL, copy `.env.example` to `.env`, and replace `DATABASE_URL` with your connection string, keeping Neon's TLS parameters. Never commit credentials.
+Requires **Node.js 24.x** (Vercel-supported; see `.nvmrc`) and PostgreSQL. Room storage uses `pg`. Create a Neon project or use local PostgreSQL, copy `.env.example` to `.env`, and replace `DATABASE_URL` with your connection string, keeping Neon's TLS parameters. Never commit credentials.
 
 ```sh
 npm ci
@@ -31,6 +31,10 @@ Click the EATWHAT logo or **Back to create room** from any room screen to return
 Rooms persist in Neon PostgreSQL. `DATABASE_URL` is required. Start, dev, migration, connection-check, and test scripts load `.env` when present using Node’s built-in loader; CI and hosting can supply environment variables directly without that file. Keep Neon's TLS parameters in the URL. `.env` is ignored by Git. `npm run db:migrate` (also available as `npm run db:init`) applies the idempotent `migrations/001_rooms.sql` migration and is safe to rerun. `npm run db:check` verifies connectivity without printing connection details. The server checks the rooms table before listening. Transactions and row locks preserve concurrent joins, readiness changes, and votes across server instances.
 
 The migration creates the PostgreSQL table; it does not copy rooms from an existing `.data/eatwhat.sqlite` file. Keep that file if you need its history. For HTTPS deployments, set `COOKIE_SECURE=true`. Real restaurant discovery, geolocation, account recovery, and production abuse controls are not included.
+
+New databases use JSONB room data and timestamp updates. Existing PostgreSQL tables with text room data and millisecond updates remain supported without rewriting saved rooms. Tests can use `TEST_DATABASE_URL` to select a separate database; each run uses its own temporary schema.
+
+For Vercel, import the repository, choose Node.js 24.x, and configure `DATABASE_URL` and `COOKIE_SECURE=true` in the project environment. Run `npm run db:init` against that database before serving requests. `vercel.json` serves `public` and routes API requests through `api/index.js`; importing the handler does not start a separate HTTP listener.
 
 ## Design system
 

@@ -6,6 +6,13 @@ const database = await testDatabase();
 process.env.DATABASE_URL = database.url;
 process.env.EATWHAT_TEST_SCHEMA = database.schema;
 const { server } = await import("../server.js");
+const { default: handler } = await import("../api/index.js");
+assert.equal(typeof handler, "function");
+assert.equal(
+  server.listening,
+  false,
+  "Importing the Vercel handler must not start a listener",
+);
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(async () => {
