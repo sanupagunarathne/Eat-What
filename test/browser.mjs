@@ -2,21 +2,20 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { testDatabase } from "./database.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-if (!process.env.TEST_DATABASE_URL)
-  throw new Error(
-    "Set TEST_DATABASE_URL to an initialized, isolated PostgreSQL test database.",
-  );
-const data = mkdtempSync(join(tmpdir(), "eatwhat-browser-"));
+const database = await testDatabase();
 const port = 3107,
   base = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, ["server.js"], {
   env: {
     ...process.env,
+    NODE_ENV: "development",
     PORT: String(port),
-    DATABASE_URL: process.env.TEST_DATABASE_URL,
+    DATABASE_URL: database.url,
+    EATWHAT_TEST_SCHEMA: database.schema,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -61,7 +60,7 @@ async function audit(page, screen) {
 }
 try {
   let ready = false;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 200; i++) {
     try {
       ready = (await fetch(base)).ok;
       if (ready) break;
@@ -120,6 +119,23 @@ try {
     .waitFor();
   const code = await host.locator(".room-code").innerText();
   assert.match(code, /^[A-F0-9]{6}$/);
+  // Home must stay home even with a saved room, including after reload.
+  await host.getByRole("link", { name: "EATWHAT home" }).click();
+  await host
+    .getByRole("heading", { name: "Your table starts here." })
+    .waitFor();
+  assert.equal(new URL(host.url()).search, "");
+  await host.reload();
+  await host
+    .getByRole("heading", { name: "Your table starts here." })
+    .waitFor();
+  await host.getByRole("button", { name: `Back to room ${code}` }).click();
+  await host
+    .getByRole("heading", { name: "A table worth waiting for." })
+    .waitFor();
+  assert.equal(new URL(host.url()).search, `?room=${code}`);
+  await host.getByRole("button", { name: "Back to create room" }).click();
+  await host.getByRole("button", { name: `Back to room ${code}` }).click();
   await audit(host, "lobby");
   await host.screenshot({
     path: join(tmpdir(), "eatwhat-lobby.png"),
@@ -157,6 +173,16 @@ try {
     .waitFor();
   assert.equal(await guest.locator(".image-count").innerText(), "1 / 6");
   await audit(host, "waiting for private votes");
+  await host.getByRole("button", { name: "Back to create room" }).click();
+  await host.waitForTimeout(1700);
+  await host
+    .getByRole("heading", { name: "Your table starts here." })
+    .waitFor();
+  assert.equal(new URL(host.url()).search, "");
+  await host.getByRole("button", { name: `Back to room ${code}` }).click();
+  await host
+    .getByRole("heading", { name: "Good taste takes a moment." })
+    .waitFor();
   for (let i = 0; i < 6; i++) {
     const old = await guest.locator(".image-count").innerText();
     await guest.getByRole("button", { name: "Yes, I’d eat this" }).click();
@@ -275,7 +301,10 @@ try {
   );
 } finally {
   await browser?.close();
-  child.kill();
-  await new Promise((resolve) => child.once("exit", resolve));
-  rmSync(data, { recursive: true, force: true });
+  if (child.exitCode === null && child.signalCode === null) {
+    const exited = new Promise((resolve) => child.once("exit", resolve));
+    child.kill();
+    await exited;
+  }
+  await database.cleanup();
 }

@@ -4,11 +4,13 @@ A warm, mobile-first group dining app. Create a table, invite your people, vote 
 
 ## Development and database setup
 
-Use Node.js **24.x** (Vercel-supported; see `.nvmrc`) and PostgreSQL. Create a **Neon Free** project manually, or use local PostgreSQL. Copy `.env.example` to `.env` and replace `DATABASE_URL` with your Neon pooled connection string, keeping `sslmode=require`. Never commit credentials.
+Requires **Node.js 24.x** (Vercel-supported; see `.nvmrc`) and PostgreSQL. Room storage uses `pg`. Create a Neon project or use local PostgreSQL, copy `.env.example` to `.env`, and replace `DATABASE_URL` with your connection string, keeping Neon's TLS parameters. Never commit credentials.
 
 ```sh
 npm ci
-npm run db:init
+# Save DATABASE_URL from Neon in .env, including its TLS parameters.
+npm run db:check
+npm run db:migrate
 npm run dev
 ```
 
@@ -39,6 +41,8 @@ Troubleshooting: missing `DATABASE_URL` means the environment needs configuratio
 
 References: [Vercel Node functions](https://vercel.com/docs/functions/runtimes/node-js), [PostgreSQL driver pooling](https://node-postgres.com/apis/pool).
 
+Click the EATWHAT logo or **Back to create room** from any room screen to return to create/join. Home stays on the setup screen after a reload. **Back to room** explicitly resumes your saved room, including your votes; returning home keeps your seat in that room. Refreshing a room URL still restores that room.
+
 ## How the flow works
 
 - **Create/join:** the host sets any number of participants, a per-person budget in Sri Lankan rupees, maximum distance, cuisine, and optional vegetarian preference. Guests enter a six-character code or follow an invite link.
@@ -46,6 +50,14 @@ References: [Vercel Node functions](https://vercel.com/docs/functions/runtimes/n
 - **Voting:** each participant gets the same filtered deck. Yes/Pass controls are always available alongside horizontal swipes. Votes are immutable and private; responses include only your own voted meal IDs and other participants’ completion status.
 - **Result:** results wait until everyone has voted on every meal. A match requires a yes from every participant. When several meals match, the first in the common catalogue wins. No-match and no-meals states are explicit. Only the host can restart; a restart clears votes and readiness.
 - **Reconnect:** reloads preserve the current room and membership. Polling refreshes the shared room every 1.5 seconds, pauses in hidden tabs, and reports temporary connection loss.
+
+Rooms persist in Neon PostgreSQL. `DATABASE_URL` is required. Start, dev, migration, connection-check, and test scripts load `.env` when present using Node’s built-in loader; CI and hosting can supply environment variables directly without that file. Keep Neon's TLS parameters in the URL. `.env` is ignored by Git. `npm run db:migrate` (also available as `npm run db:init`) applies the idempotent `migrations/001_rooms.sql` migration and is safe to rerun. `npm run db:check` verifies connectivity without printing connection details. The server checks the rooms table before listening. Transactions and row locks preserve concurrent joins, readiness changes, and votes across server instances.
+
+The migration creates the PostgreSQL table; it does not copy rooms from an existing `.data/eatwhat.sqlite` file. Keep that file if you need its history. For HTTPS deployments, set `COOKIE_SECURE=true`. Real restaurant discovery, geolocation, account recovery, and production abuse controls are not included.
+
+New databases use JSONB room data and timestamp updates. Existing PostgreSQL tables with text room data and millisecond updates remain supported without rewriting saved rooms. Tests can use `TEST_DATABASE_URL` to select a separate database; each run uses its own temporary schema.
+
+For Vercel, import the repository, choose Node.js 24.x, and configure `DATABASE_URL` and `COOKIE_SECURE=true` in the project environment. Run `npm run db:init` against that database before serving requests. `vercel.json` serves `public` and routes API requests through `api/index.js`; importing the handler does not start a separate HTTP listener.
 
 ## Design system
 
@@ -64,15 +76,15 @@ Espresso text accompanies gold, mint, and cream surfaces. Colour statuses always
 ## Validation
 
 ```sh
-npm run build          # Syntax validation; no frontend compilation needed
-npm test               # 11 API workflow/security tests with a test-only memory store
-npm run test:postgres  # Same tests against TEST_DATABASE_URL; skips if missing
-npx playwright install chromium
-npm run test:browser   # Requires TEST_DATABASE_URL and browser installation
-npx prettier --check server.js db.js api scripts test README.md package.json vercel.json .github/workflows/checks.yml
+npm run check        # JavaScript syntax
+npm run test:navigation # Browser navigation regression checks without a database
+npm test             # API/integration tests in an isolated PostgreSQL schema
+npx playwright install chromium  # If a system Chromium is not available
+npm run test:browser  # Real two-context group flow, responsive layout, axe WCAG A/AA checks
+npx prettier --check .
 ```
 
-For PostgreSQL tests, initialize an isolated test database first (`DATABASE_URL` set to that database when running `db:init`). Test rooms remain in the test database. GitHub Actions provides PostgreSQL 17, initializes it, and runs API and browser tests. The browser suite exercises two participants, readiness, voting, results, reload, restart, accessibility, and responsive layouts. `CHROMIUM_PATH` can override the browser executable. Browser screenshots go to the OS temporary directory.
+Browser tests automatically use `/usr/bin/chromium` when available; `CHROMIUM_PATH` overrides that selection. Otherwise, they use Playwright’s downloaded Chromium. The browser script starts its own server on port `3107`, uses a temporary PostgreSQL schema, and writes review screenshots to the OS temporary directory. Tests require DATABASE_URL and permission to create/drop schemas. They remove only their own randomly named schemas and do not modify development rooms. `npm run test:browser` checks create/join, lobby readiness, private voting, swipe input, waiting, unanimous/no-match results, reload/restart, reduced motion, invalid codes, and horizontal overflow at phone/tablet/desktop sizes.
 
 Local verification used Node 26 because that is installed in this workspace; Node 24 verification is configured in CI. Live PostgreSQL, browser workflow, CI, and Vercel deployment checks require the appropriate environment and must be verified before release.
 

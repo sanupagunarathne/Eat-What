@@ -21,7 +21,6 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql://eatwhat:test-only@localhost:5432/eatwhat_test
-      TEST_DATABASE_URL: postgresql://eatwhat:test-only@localhost:5432/eatwhat_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,8 +29,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npx prettier --check server.js db.js api scripts test README.md package.json vercel.json .github/workflows/checks.yml
-      - run: npm run db:init
+      - run: npx prettier --check .
+      - run: npm run db:check
+      - run: npm run db:migrate
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run test:navigation

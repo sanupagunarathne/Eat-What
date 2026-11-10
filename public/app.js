@@ -8,6 +8,7 @@ const app = {
   error: "",
   offline: false,
 };
+let navigationVersion = 0;
 const escape = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -45,7 +46,21 @@ function remember(room) {
   app.room = room;
   localStorage.setItem("eatwhat-room", room.code);
   app.screen = "room";
-  history.replaceState({}, "", `?room=${room.code}`);
+  if (location.search !== `?room=${room.code}`)
+    history.pushState({}, "", `?room=${room.code}`);
+}
+function goHome() {
+  navigationVersion++;
+  app.screen = "home";
+  app.tab = "create";
+  app.busy = false;
+  app.error = "";
+  app.offline = false;
+  if (location.search || location.hash) history.pushState({}, "", "/");
+  render(true);
+  announce(
+    "Create or join a room. You can return to your previous room below.",
+  );
 }
 function errorMarkup() {
   return app.error
@@ -84,6 +99,11 @@ function render(focus = false) {
   const previous = document.activeElement?.id;
   main.innerHTML = `${app.offline ? '<div class="connection-banner" role="status">Connection interrupted. Reconnecting to your table…</div>' : ""}${app.screen === "home" ? home() : app.room.phase === "lobby" ? lobby(app.room) : app.room.phase === "voting" ? voting(app.room) : result(app.room)}`;
   main.className = app.screen === "home" ? "home-main" : "room-main";
+  if (app.screen === "room")
+    main.insertAdjacentHTML(
+      "afterbegin",
+      '<div class="room-navigation"><button class="text-button" id="back-home">Back to create room</button><span class="fine-print">Your room and votes are saved.</span></div>',
+    );
   bind();
   if (focus) {
     const heading = main.querySelector("h1");
@@ -95,6 +115,7 @@ function render(focus = false) {
 }
 async function action(action, data = {}) {
   if (app.busy) return;
+  const version = navigationVersion;
   app.busy = true;
   app.error = "";
   main.querySelectorAll("button").forEach((b) => {
@@ -103,6 +124,7 @@ async function action(action, data = {}) {
   const before = app.room.phase;
   try {
     const room = await api(`/${app.room.code}/${action}`, data);
+    if (version !== navigationVersion) return;
     remember(room);
     app.error = "";
     announce(
@@ -115,13 +137,17 @@ async function action(action, data = {}) {
           : "Room updated.",
     );
   } catch (e) {
+    if (version !== navigationVersion) return;
     app.error = e.message;
   } finally {
-    app.busy = false;
-    render(before !== app.room.phase);
+    if (version === navigationVersion) {
+      app.busy = false;
+      render(before !== app.room.phase);
+    }
   }
 }
 function bind() {
+  $("#back-home")?.addEventListener("click", goHome);
   main.querySelectorAll("[data-tab]").forEach((b) =>
     b.addEventListener("click", () => {
       app.tab = b.dataset.tab;
@@ -133,6 +159,7 @@ function bind() {
   $("#room-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (app.busy) return;
+    const version = navigationVersion;
     const data = Object.fromEntries(new FormData(e.target));
     app.busy = true;
     app.error = "";
@@ -154,10 +181,12 @@ function bind() {
               vegetarian: data.vegetarian === "on",
             },
       );
+      if (version !== navigationVersion) return;
       remember(room);
       app.busy = false;
       render(true);
     } catch (error) {
+      if (version !== navigationVersion) return;
       app.error = error.message;
       app.busy = false;
       e.target.querySelector(".error-message")?.remove();
@@ -172,14 +201,10 @@ function bind() {
   );
   $("#start")?.addEventListener("click", () => action("start"));
   $("#restart")?.addEventListener("click", () => action("restart"));
-  $("#new-room")?.addEventListener("click", () => {
-    app.screen = "home";
-    app.tab = "create";
-    app.error = "";
-    render(true);
-  });
+  $("#new-room")?.addEventListener("click", goHome);
   $("#resume")?.addEventListener("click", () => {
-    app.screen = "room";
+    navigationVersion++;
+    remember(app.room);
     render(true);
   });
   const vote = (yes) => {
@@ -220,6 +245,20 @@ function bind() {
   );
 }
 $("#how-button").addEventListener("click", () => $("#how-dialog").showModal());
+$(".brand").addEventListener("click", (event) => {
+  if (
+    event.button ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.altKey
+  )
+    return;
+  event.preventDefault();
+  goHome();
+});
+// Re-read the URL when using browser Back/Forward, just as on a direct visit.
+window.addEventListener("popstate", () => location.reload());
 $$dialog();
 function $$dialog() {
   document
@@ -242,20 +281,35 @@ render();
 const stored = localStorage.getItem("eatwhat-room"),
   requested = new URLSearchParams(location.search).get("room");
 if (stored && (!requested || stored === requested)) {
+  const version = navigationVersion;
   try {
-    remember(await api(`/${stored}`));
-    render();
+    const room = await api(`/${stored}`);
+    if (version === navigationVersion) {
+      if (requested) remember(room);
+      else app.room = room;
+      render();
+    }
   } catch {
-    localStorage.removeItem("eatwhat-room");
+    if (version === navigationVersion) localStorage.removeItem("eatwhat-room");
   }
 }
 let polling = false;
 setInterval(async () => {
-  if (!app.room || app.busy || polling || document.hidden) return;
+  if (
+    app.screen !== "room" ||
+    !app.room ||
+    app.busy ||
+    polling ||
+    document.hidden
+  )
+    return;
+  const version = navigationVersion;
+  const code = app.room.code;
   polling = true;
   try {
-    const next = await api(`/${app.room.code}`);
-    if (app.busy) return;
+    const next = await api(`/${code}`);
+    if (app.busy || version !== navigationVersion || app.room?.code !== code)
+      return;
     const changed = JSON.stringify(next) !== JSON.stringify(app.room);
     const phaseChanged = next.phase !== app.room.phase;
     const wasOffline = app.offline;
@@ -266,6 +320,7 @@ setInterval(async () => {
       if (phaseChanged) announce("Your table has moved to the next step.");
     }
   } catch {
+    if (version !== navigationVersion || app.screen !== "room") return;
     if (!app.offline) {
       app.offline = true;
       if (app.screen === "room") render();
