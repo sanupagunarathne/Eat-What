@@ -1,24 +1,115 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#F5F0ED">
-  <meta name="description" content="Less deciding. More dining. Find a meal your whole group wants with EATWHAT.">
-  <title>EATWHAT — Good food. All agreed.</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
-  <script type="module" src="/app.js"></script>
-</head>
-<body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header">
-    <a href="/" class="brand" aria-label="EATWHAT home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 19h30c0 10-7 15-15 15S5 29 5 19Zm4 17h22M12 13c-5-5 5-5 0-10m9 10c-5-5 5-5 0-10m9 10c-5-5 5-5 0-10"/></svg>EATWHAT<span class="brand-dot">®</span></a>
-    <nav aria-label="Main navigation"><span class="header-note">GOOD FOOD. ALL AGREED.</span><button class="text-button" id="how-button">How it works <span aria-hidden="true">↗</span></button></nav>
-  </header>
-  <main id="main" tabindex="-1"></main>
-  <footer class="site-footer"><span>A LITTLE LESS “I DON’T KNOW.” A LOT MORE “LET’S EAT.”</span><span>Made for the group chat. <span aria-hidden="true">↗</span></span></footer>
-  <dialog id="how-dialog" aria-labelledby="how-title"><button class="dialog-close" aria-label="Close instructions">×</button><span class="eyebrow">THE RECIPE FOR AGREEMENT</span><h2 id="how-title">One table. One decision.</h2><ol class="how-list"><li><strong>Make a room.</strong><p>Set your group size, budget, and distance. Share the invite link.</p></li><li><strong>Get everyone ready.</strong><p>Each person joins on their own device. The host starts when the whole table is ready.</p></li><li><strong>Go with your gut.</strong><p>Vote privately on every meal. A match needs a yes from everyone. If several match, the first meal in the shared deck wins.</p></li></ol><p class="fine-print">This first edition uses a sample menu, illustrative venues, and distances. Directions searches for nearby restaurants of the winning cuisine; it is not a booking or a verified venue listing.</p><button class="button gold dialog-close">Got it. Let’s eat <span aria-hidden="true">↗</span></button></dialog>
-  <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#F5F0ED" />
+    <meta
+      name="description"
+      content="Less deciding. More dining. Find a meal your whole group wants with EATWHAT."
+    />
+    <title>EATWHAT — Good food. All agreed.</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a href="/" class="brand" aria-label="EATWHAT home"
+        ><svg viewBox="0 0 40 40" aria-hidden="true">
+          <path
+            d="M5 19h30c0 10-7 15-15 15S5 29 5 19Zm4 17h22M12 13c-5-5 5-5 0-10m9 10c-5-5 5-5 0-10m9 10c-5-5 5-5 0-10"
+          /></svg
+        >EATWHAT<span class="brand-dot">®</span></a
+      >
+      <nav aria-label="Main navigation">
+        <span class="header-note">GOOD FOOD. ALL AGREED.</span
+        ><button class="text-button" id="how-button">
+          How it works
+          <span aria-hidden="true"
+            ><svg
+              class="icon arrow-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 18 18 6M6 6h12v12" /></svg
+          ></span>
+        </button>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="site-footer">
+      <span>A LITTLE LESS “I DON’T KNOW.” A LOT MORE “LET’S EAT.”</span
+      ><span
+        >Made for the group chat.
+        <span aria-hidden="true"
+          ><svg
+            class="icon arrow-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 18 18 6M6 6h12v12" /></svg></span
+      ></span>
+    </footer>
+    <dialog id="how-dialog" aria-labelledby="how-title">
+      <button class="dialog-close" aria-label="Close instructions">×</button
+      ><span class="eyebrow">THE RECIPE FOR AGREEMENT</span>
+      <h2 id="how-title">One table. One decision.</h2>
+      <ol class="how-list">
+        <li>
+          <strong>Make a room.</strong>
+          <p>
+            Set your group size, budget, and distance. Share the invite link.
+          </p>
+        </li>
+        <li>
+          <strong>Get everyone ready.</strong>
+          <p>
+            Each person joins on their own device. The host starts when the
+            whole table is ready.
+          </p>
+        </li>
+        <li>
+          <strong>Go with your gut.</strong>
+          <p>
+            Vote privately on every meal. A match needs a yes from everyone. If
+            several match, the first meal in the shared deck wins.
+          </p>
+        </li>
+      </ol>
+      <p class="fine-print">
+        This first edition uses a sample menu, illustrative venues, and
+        distances. Directions searches for nearby restaurants of the winning
+        cuisine; it is not a booking or a verified venue listing.
+      </p>
+      <button class="button gold dialog-close">
+        Got it. Let’s eat
+        <span aria-hidden="true"
+          ><svg
+            class="icon arrow-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 18 18 6M6 6h12v12" /></svg
+        ></span>
+      </button>
+    </dialog>
+    <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
+  </body>
 </html>
