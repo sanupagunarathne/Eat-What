@@ -8,8 +8,8 @@ process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "eatwhat-test-"));
 const { server } = await import("../server.js");
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
-after(() => {
-  server.close();
+after(async () => {
+  await new Promise((resolve) => server.close(resolve));
   rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 });
 function person() {
@@ -37,7 +37,7 @@ function person() {
 const settings = {
   name: "Alex",
   expected: 2,
-  budget: 25,
+  budget: 25000,
   distance: 3,
   cuisine: "Any",
   vegetarian: false,
@@ -106,7 +106,7 @@ test("filters enforce budget, distance, cuisine, and vegetarian preference", asy
     "",
     {
       ...settings,
-      budget: 20,
+      budget: 4500,
       distance: 3,
       cuisine: "Indian",
       vegetarian: true,
@@ -120,7 +120,7 @@ test("filters enforce budget, distance, cuisine, and vegetarian preference", asy
 });
 test("empty filtered menus become an explicit empty state", async () => {
   const { host, guest, path } = await table({
-    budget: 15,
+    budget: 3000,
     distance: 1,
     vegetarian: true,
   });
@@ -133,7 +133,9 @@ test("empty filtered menus become an explicit empty state", async () => {
 test("invalid configuration, names, codes, and votes are rejected", async () => {
   const client = person();
   await client("", null, 400);
-  await client("", { ...settings, expected: 1 }, 400);
+  await client("", { ...settings, expected: 0 }, 400);
+  const largeRoom = await client("", { ...settings, expected: 120 }, 201);
+  assert.equal(largeRoom.expected, 120);
   await client("", { ...settings, budget: -5 }, 400);
   await client("", { ...settings, name: "" }, 400);
   await client("/ZZZZZZ/join", { name: "Sam" }, 404);

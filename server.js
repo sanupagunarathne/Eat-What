@@ -254,6 +254,7 @@ export const server = createServer(async (req, res) => {
     });
   }
 });
+server.on("close", () => db.close());
 if (process.env.NODE_ENV !== "test")
   server.listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
     console.log(`EATWHAT running on port ${process.env.PORT || 3000}`),
