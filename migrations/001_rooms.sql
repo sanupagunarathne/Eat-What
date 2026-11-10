@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS public.rooms (
+  code TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  updated BIGINT NOT NULL
+);

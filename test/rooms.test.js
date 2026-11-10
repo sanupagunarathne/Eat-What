@@ -1,16 +1,16 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { testDatabase } from "./database.js";
 process.env.NODE_ENV = "test";
-process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "eatwhat-test-"));
+const database = await testDatabase();
+process.env.DATABASE_URL = database.url;
+process.env.EATWHAT_TEST_SCHEMA = database.schema;
 const { server } = await import("../server.js");
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  rmSync(process.env.DATA_DIR, { recursive: true, force: true });
+  await database.cleanup();
 });
 function person() {
   let cookie = "";
@@ -182,4 +182,23 @@ test("overlapping slow requests preserve both participants’ readiness and vote
   const result = await host(path);
   assert.equal(result.phase, "result");
   assert.equal(result.winner.id, room.meals[0].id);
+});
+
+test("concurrent joins cannot claim the same final seat", async () => {
+  const host = person();
+  const room = await host("", settings, 201);
+  const responses = await Promise.all(
+    ["Sam", "Pat"].map((name) =>
+      fetch(`${base}/api/rooms/${room.code}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    ),
+  );
+  assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
+  // The rejected transaction must release its lock and leave the room usable.
+  const saved = await host(`/${room.code}/ready`, { ready: true });
+  assert.equal(saved.members.length, 2);
+  assert.equal(saved.ready, true);
 });

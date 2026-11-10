@@ -4,16 +4,21 @@ A warm, mobile-first group dining app. Create a table, invite your people, vote 
 
 ## Development
 
-Requires **Node.js 24+** (see `.nvmrc`). The application has no runtime package dependencies.
+Requires **Node.js 24+** (see `.nvmrc`) and PostgreSQL. Room storage uses `pg`.
 
 ```sh
 npm ci
+# Save DATABASE_URL from Neon in .env, including its TLS parameters.
+npm run db:check
+npm run db:migrate
 npm run dev
 ```
 
 The server listens on port `3000`; use `PORT` to change it. `npm start` runs without file watching. No compilation step is required. Use the existing checkout; a separate Git worktree is not necessary.
 
 Open the app on separate devices or separate browser profiles to try a group session. Tabs in one browser profile intentionally share one participant identity through an HTTP-only cookie. Invite links prefill the room code; guests enter their own names. An invited device must be able to reach the host serving the app.
+
+Click the EATWHAT logo or **Back to create room** from any room screen to return to create/join. Home stays on the setup screen after a reload. **Back to room** explicitly resumes your saved room, including your votes; returning home keeps your seat in that room. Refreshing a room URL still restores that room.
 
 ## How the flow works
 
@@ -23,7 +28,9 @@ Open the app on separate devices or separate browser profiles to try a group ses
 - **Result:** results wait until everyone has voted on every meal. A match requires a yes from every participant. When several meals match, the first in the common catalogue wins. No-match and no-meals states are explicit. Only the host can restart; a restart clears votes and readiness.
 - **Reconnect:** reloads preserve the current room and membership. Polling refreshes the shared room every 1.5 seconds, pauses in hidden tabs, and reports temporary connection loss.
 
-Rooms persist in `.data/eatwhat.sqlite` using Node’s built-in SQLite driver. Set `DATA_DIR` to choose a different directory. Keep it writable and persist it when deploying. For an HTTPS deployment, set `COOKIE_SECURE=true`. This is a single-instance first version; real restaurant discovery, geolocation, account recovery, and production abuse controls are not included.
+Rooms persist in Neon PostgreSQL. `DATABASE_URL` is required. Start, dev, migration, connection-check, and test scripts load `.env` using Node’s built-in loader. Keep Neon's TLS parameters in the URL. `.env` is ignored by Git. `npm run db:migrate` applies the idempotent `migrations/001_rooms.sql` migration and is safe to rerun. `npm run db:check` verifies connectivity without printing connection details. The server checks the rooms table before listening. Transactions and row locks preserve concurrent joins, readiness changes, and votes across server instances.
+
+The migration creates the PostgreSQL table; it does not copy rooms from an existing `.data/eatwhat.sqlite` file. Keep that file if you need its history. For HTTPS deployments, set `COOKIE_SECURE=true`. Real restaurant discovery, geolocation, account recovery, and production abuse controls are not included.
 
 ## Design system
 
@@ -43,13 +50,14 @@ Espresso text accompanies gold, mint, and cream surfaces. Colour statuses always
 
 ```sh
 npm run check        # JavaScript syntax
-npm test             # Nine API/integration tests with isolated temporary data
+npm run test:navigation # Browser navigation regression checks without a database
+npm test             # API/integration tests in an isolated PostgreSQL schema
 npx playwright install chromium  # If a system Chromium is not available
 npm run test:browser  # Real two-context group flow, responsive layout, axe WCAG A/AA checks
 npx prettier --check .
 ```
 
-Browser tests automatically use `/usr/bin/chromium` when available; `CHROMIUM_PATH` overrides that selection. Otherwise, they use Playwright’s downloaded Chromium. The browser script starts its own server on port `3107`, uses temporary storage, and writes review screenshots to the OS temporary directory. Tests do not modify development rooms. `npm run test:browser` checks create/join, lobby readiness, private voting, swipe input, waiting, unanimous/no-match results, reload/restart, reduced motion, invalid codes, and horizontal overflow at phone/tablet/desktop sizes.
+Browser tests automatically use `/usr/bin/chromium` when available; `CHROMIUM_PATH` overrides that selection. Otherwise, they use Playwright’s downloaded Chromium. The browser script starts its own server on port `3107`, uses a temporary PostgreSQL schema, and writes review screenshots to the OS temporary directory. Tests require DATABASE_URL and permission to create/drop schemas. They remove only their own randomly named schemas and do not modify development rooms. `npm run test:browser` checks create/join, lobby readiness, private voting, swipe input, waiting, unanimous/no-match results, reload/restart, reduced motion, invalid codes, and horizontal overflow at phone/tablet/desktop sizes.
 
 For a sandbox that does not permit the default npm cache directory, pass `--cache /tmp/eatwhat-npm-cache` to npm/npx.
 

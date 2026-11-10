@@ -7,15 +7,21 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js",
-    "test:browser": "node test/browser.mjs",
-    "check": "node --check server.js && node --check public/app.js"
+    "start": "node --env-file=.env server.js",
+    "dev": "node --env-file=.env --watch server.js",
+    "test": "node --env-file=.env --test test/*.test.js",
+    "test:browser": "node --env-file=.env test/browser.mjs",
+    "test:navigation": "node test/navigation.mjs",
+    "check": "node --check server.js && node --check public/app.js",
+    "db:migrate": "node --env-file=.env scripts/migrate.js",
+    "db:check": "node --env-file=.env scripts/check-db.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.0",
     "prettier": "^3.9.10"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }
