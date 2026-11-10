@@ -81,7 +81,10 @@ try {
   }
   await host.goto(base);
   await audit(host, "desktop create");
-  await host.screenshot({ path: "/tmp/eatwhat-desktop.png", fullPage: true });
+  await host.screenshot({
+    path: join(tmpdir(), "eatwhat-desktop.png"),
+    fullPage: true,
+  });
   await host.keyboard.press("Tab");
   assert.ok(
     await host.evaluate(
@@ -95,9 +98,14 @@ try {
     await audit(guest, `create at ${width}px`);
   }
   await guest.setViewportSize({ width: 390, height: 844 });
-  await guest.screenshot({ path: "/tmp/eatwhat-mobile.png", fullPage: true });
+  await guest.screenshot({
+    path: join(tmpdir(), "eatwhat-mobile.png"),
+    fullPage: true,
+  });
   await host.getByLabel("YOUR NAME").fill("Alex");
-  await host.getByLabel("PEOPLE", { exact: true }).selectOption("2");
+  await host.getByLabel("PEOPLE", { exact: true }).fill("2");
+  await host.getByLabel("BUDGET (LKR)", { exact: true }).fill("10000");
+  await host.getByLabel("DISTANCE (KM)", { exact: true }).fill("3");
   await host.getByRole("button", { name: "Create room", exact: true }).click();
   await host
     .getByRole("heading", { name: "A table worth waiting for." })
@@ -105,7 +113,10 @@ try {
   const code = await host.locator(".room-code").innerText();
   assert.match(code, /^[A-F0-9]{6}$/);
   await audit(host, "lobby");
-  await host.screenshot({ path: "/tmp/eatwhat-lobby.png", fullPage: true });
+  await host.screenshot({
+    path: join(tmpdir(), "eatwhat-lobby.png"),
+    fullPage: true,
+  });
   await guest.goto(`${base}/?room=${code}`);
   await guest.getByLabel("YOUR NAME").fill("Sam");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
@@ -119,7 +130,10 @@ try {
   await guest.getByRole("heading", { name: "Would you eat this?" }).waitFor();
   await audit(host, "voting");
   await audit(guest, "mobile voting");
-  await host.screenshot({ path: "/tmp/eatwhat-voting.png", fullPage: true });
+  await host.screenshot({
+    path: join(tmpdir(), "eatwhat-voting.png"),
+    fullPage: true,
+  });
   // Independent contexts prove identities and private vote progress are separate.
   for (let i = 0; i < 6; i++) {
     const old = await host.locator(".image-count").innerText();
@@ -164,7 +178,10 @@ try {
       .getAttribute("href"),
     /^https:\/\/www.google.com\/maps\/search/,
   );
-  await host.screenshot({ path: "/tmp/eatwhat-match.png", fullPage: true });
+  await host.screenshot({
+    path: join(tmpdir(), "eatwhat-match.png"),
+    fullPage: true,
+  });
   await host.reload();
   await host
     .getByRole("heading", { name: "It’s a match. Let’s eat." })
@@ -215,9 +232,9 @@ try {
     .getByRole("button", { name: "Create a room", exact: true })
     .click();
   await other.getByLabel("YOUR NAME").fill("Taylor");
-  await other.getByLabel("PEOPLE", { exact: true }).selectOption("2");
-  await other.getByLabel("PER PERSON").selectOption("15");
-  await other.getByLabel("DISTANCE", { exact: true }).selectOption("1");
+  await other.getByLabel("PEOPLE", { exact: true }).fill("2");
+  await other.getByLabel("BUDGET (LKR)", { exact: true }).fill("3000");
+  await other.getByLabel("DISTANCE (KM)", { exact: true }).fill("1");
   await other.getByLabel("Vegetarian options only").check();
   await other.getByRole("button", { name: "Create room", exact: true }).click();
   await other
