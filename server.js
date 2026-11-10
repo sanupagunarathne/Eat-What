@@ -108,8 +108,10 @@ export const server = createServer(async (req, res) => {
         if (!Number.isSafeInteger(expected) || expected < 1)
           fail(400, "Enter a whole number of people greater than zero.");
         if (
-          !Number.isFinite(budget) || budget <= 0 ||
-          !Number.isFinite(distance) || distance <= 0 ||
+          !Number.isFinite(budget) ||
+          budget <= 0 ||
+          !Number.isFinite(distance) ||
+          distance <= 0 ||
           !["Any", "Indian", "Italian", "Asian", "American"].includes(
             cuisine,
           ) ||
