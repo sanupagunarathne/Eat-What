@@ -14,9 +14,32 @@ npm run db:migrate
 npm run dev
 ```
 
-The server listens on port `3000`; use `PORT` to change it. `npm start` runs without file watching. No compilation step is required. Use the existing checkout; a separate Git worktree is not necessary.
+Open http://localhost:3000 in separate browser profiles to represent separate participants. Tabs share the HTTP-only session cookie. `npm start` runs without watching; `PORT` optionally changes the local port. `.env` loads automatically for development, startup, and initialization.
 
-Open the app on separate devices or separate browser profiles to try a group session. Tabs in one browser profile intentionally share one participant identity through an HTTP-only cookie. Invite links prefill the room code; guests enter their own names. An invited device must be able to reach the host serving the app.
+Required environment variable: `DATABASE_URL`. Optional: `COOKIE_SECURE=true` for local HTTPS (leave false for HTTP). Vercel and `NODE_ENV=production` always use Secure cookies. Tests use a separate initialized database specified by `TEST_DATABASE_URL`; never point this at production.
+
+`npm run db:init` runs `migrations/001_rooms.sql`, creating the table if absent. It is idempotent and non-destructive. Run once per database before deployment; it does not run during requests or on every deployment.
+
+## Architecture and Vercel Hobby deployment
+
+Rooms retain their JSON structure in PostgreSQL JSONB rows keyed by six-character room codes. The `pg` driver uses parameterized SQL and a reused pool capped at three connections per function instance. Use Neon's pooled hostname to manage connections across instances. Each mutation reads the room with `SELECT FOR UPDATE` inside a transaction, applies existing validation and authorization, and commits before responding. Concurrent votes, joins, and readiness updates cannot overwrite one another. Atomic inserts retry room-code collisions.
+
+`api/index.js` exports the native HTTP request handler without opening a listening server. `vercel.json` rewrites only `/api/*` to that function and serves `public` assets directly, preserving the frontend. Local `server.js` still serves both API and static files. No database state is written to disk.
+
+Deployment checklist:
+
+1. Initialize your Neon Free database and run the checks below.
+2. Review the changes, then commit and push to the GitHub branch connected to Vercel when ready. No push or deployment has been performed here.
+3. In Vercel use this repository root, Framework Preset **Other**, Node.js **24.x**, Install Command `npm ci`, Build Command `npm run build`, Output Directory `public`. Remove stale overrides referring to `server.mjs` or SQLite. Configuration is also in `vercel.json`.
+4. Add sensitive `DATABASE_URL` for Production and any Preview environments. Prefer a separate Neon database/branch for previews; initialize each database once.
+5. Redeploy the GitHub commit after setting environment variables.
+6. In two browser profiles verify create, join, both ready, host start, all votes, result, reload, and host restart; check function logs. A live Vercel deployment remains to be verified.
+
+Existing SQLite rooms are not imported. Preserve `.data/eatwhat.sqlite` as a backup if needed; users create new rooms after migration. Clearing participant cookies loses the associated identity. The application still uses illustrative meals and polling; restaurant discovery, account recovery, and abuse rate limiting are outside this migration.
+
+Troubleshooting: missing `DATABASE_URL` means the environment needs configuration; a missing `rooms` relation means run `db:init` for that database. For connection failures check Neon project status, credentials, pooled hostname, and TLS parameters. For API 404s check Root Directory and stale Vercel overrides. Redeploy after changing environment variables. API errors hide internal details; server logs report error codes without connection strings. Secure cookies require HTTPS.
+
+References: [Vercel Node functions](https://vercel.com/docs/functions/runtimes/node-js), [PostgreSQL driver pooling](https://node-postgres.com/apis/pool).
 
 Click the EATWHAT logo or **Back to create room** from any room screen to return to create/join. Home stays on the setup screen after a reload. **Back to room** explicitly resumes your saved room, including your votes; returning home keeps your seat in that room. Refreshing a room URL still restores that room.
 
@@ -63,7 +86,7 @@ npx prettier --check .
 
 Browser tests automatically use `/usr/bin/chromium` when available; `CHROMIUM_PATH` overrides that selection. Otherwise, they use Playwright’s downloaded Chromium. The browser script starts its own server on port `3107`, uses a temporary PostgreSQL schema, and writes review screenshots to the OS temporary directory. Tests require DATABASE_URL and permission to create/drop schemas. They remove only their own randomly named schemas and do not modify development rooms. `npm run test:browser` checks create/join, lobby readiness, private voting, swipe input, waiting, unanimous/no-match results, reload/restart, reduced motion, invalid codes, and horizontal overflow at phone/tablet/desktop sizes.
 
-For a sandbox that does not permit the default npm cache directory, pass `--cache /tmp/eatwhat-npm-cache` to npm/npx.
+Local verification used Node 26 because that is installed in this workspace; Node 24 verification is configured in CI. Live PostgreSQL, browser workflow, CI, and Vercel deployment checks require the appropriate environment and must be verified before release.
 
 ## Sample content
 

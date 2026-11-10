@@ -89,7 +89,11 @@ export const handler = async (req, res) => {
         session = randomUUID();
         res.setHeader(
           "Set-Cookie",
-          `eatwhat=${session}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${process.env.COOKIE_SECURE === "true" ? "; Secure" : ""}`,
+          `eatwhat=${session}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${
+            process.env.COOKIE_SECURE === "true" || process.env.VERCEL
+              ? "; Secure"
+              : ""
+          }`,
         );
       }
       if (req.method === "POST" && url.pathname === "/api/rooms") {
