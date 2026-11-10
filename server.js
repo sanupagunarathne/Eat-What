@@ -92,7 +92,11 @@ export const server = createServer(async (req, res) => {
         session = randomUUID();
         res.setHeader(
           "Set-Cookie",
-          `eatwhat=${session}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${process.env.COOKIE_SECURE === "true" ? "; Secure" : ""}`,
+          `eatwhat=${session}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${
+            process.env.COOKIE_SECURE === "true" || process.env.VERCEL
+              ? "; Secure"
+              : ""
+          }`,
         );
       }
       if (req.method === "POST" && url.pathname === "/api/rooms") {
@@ -248,14 +252,22 @@ export const server = createServer(async (req, res) => {
     });
     res.end(req.method === "HEAD" ? undefined : content);
   } catch (e) {
+    if (e instanceof URIError) e = Object.assign(e, { status: 400 });
     if (!e.status) console.error(e);
     send(e.status || 500, {
       error: e.status ? e.message : "Something went wrong. Please try again.",
     });
   }
 });
+export function createHandler() {
+  return server.listeners("request")[0];
+}
 server.on("close", () => db.close());
-if (process.env.NODE_ENV !== "test")
+if (
+  process.env.NODE_ENV !== "test" &&
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
   server.listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
     console.log(`EATWHAT running on port ${process.env.PORT || 3000}`),
   );
