@@ -17,7 +17,7 @@ Open the app on separate devices or separate browser profiles to try a group ses
 
 ## How the flow works
 
-- **Create/join:** the host sets 2–10 participants, a per-person budget, maximum distance, cuisine, and optional vegetarian preference. Guests enter a six-character code or follow an invite link.
+- **Create/join:** the host sets any number of participants, a per-person budget in Sri Lankan rupees, maximum distance, cuisine, and optional vegetarian preference. Guests enter a six-character code or follow an invite link.
 - **Lobby:** the exact group size must join and every participant must explicitly mark themselves ready. Only the host can start. Invite copying has a manual-copy fallback.
 - **Voting:** each participant gets the same filtered deck. Yes/Pass controls are always available alongside horizontal swipes. Votes are immutable and private; responses include only your own voted meal IDs and other participants’ completion status.
 - **Result:** results wait until everyone has voted on every meal. A match requires a yes from every participant. When several meals match, the first in the common catalogue wins. No-match and no-meals states are explicit. Only the host can restart; a restart clears votes and readiness.
@@ -55,6 +55,6 @@ For a sandbox that does not permit the default npm cache directory, pass `--cach
 
 ## Sample content
 
-The catalogue in `meals.js` is illustrative, including USD prices, distances, and venue names. No geolocation or restaurant API is called. “Get directions” opens a Maps search for nearby restaurants in the winning cuisine, rather than presenting a fictional venue as verified. This limitation is also stated in the interface.
+The catalogue in `meals.js` is illustrative, with illustrative Sri Lankan rupee prices and distances, and venue names. No geolocation or restaurant API is called. “Get directions” opens a Maps search for nearby restaurants in the winning cuisine, rather than presenting a fictional venue as verified. This limitation is also stated in the interface.
 
 Sample photos come from [Foodish](https://github.com/surhud004/Foodish), at `public/assets/images/{category}/{category}1.jpg` (biryani, pasta, pizza, burger, dosa, rice). Foodish credits Rajaraman Ekambaram’s initial food dataset and RitaE on Pixabay; image rights remain with their original creators. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for source and license notices. Replace the sample catalogue and photos with your approved venue data and assets when integrating a real food source.

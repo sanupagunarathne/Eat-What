@@ -105,11 +105,11 @@ export const server = createServer(async (req, res) => {
           cuisine = "Any",
           vegetarian = false,
         } = input;
-        if (!Number.isInteger(expected) || expected < 2 || expected > 10)
-          fail(400, "Choose 2–10 people.");
+        if (!Number.isSafeInteger(expected) || expected < 1)
+          fail(400, "Enter a whole number of people greater than zero.");
         if (
-          ![15, 20, 25, 35, 50].includes(budget) ||
-          ![1, 3, 5, 10].includes(distance) ||
+          !Number.isFinite(budget) || budget <= 0 ||
+          !Number.isFinite(distance) || distance <= 0 ||
           !["Any", "Indian", "Italian", "Asian", "American"].includes(
             cuisine,
           ) ||
