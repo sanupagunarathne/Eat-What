@@ -9,12 +9,15 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --env-file-if-exists=.env --watch server.js",
-    "test": "node --test test/rooms.test.js",
-    "test:browser": "node test/browser.mjs",
+    "test": "node --env-file-if-exists=.env --test test/*.test.js",
+    "test:browser": "node --env-file-if-exists=.env test/browser.mjs",
+    "test:navigation": "node test/navigation.mjs",
     "check": "node --check server.js && node --check public/app.js",
-    "db:init": "node --env-file-if-exists=.env scripts/init-db.js",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+    "db:init": "npm run db:migrate",
+    "db:check": "node --env-file-if-exists=.env scripts/check-db.js",
     "build": "npm run check",
-    "test:postgres": "node --env-file-if-exists=.env --test test/postgres.test.js"
+    "test:postgres": "npm test"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

@@ -1,25 +1,20 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync, readFileSync } from "node:fs";
+import { pool as db, roomsTable, roomTimestamp } from "./db.js";
+import { readFileSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { meals, filterMeals, unanimousMatch } from "./meals.js";
 
 const root = fileURLToPath(new URL("./public/", import.meta.url));
-const data = process.env.DATA_DIR || ".data";
-mkdirSync(data, { recursive: true });
-const db = new DatabaseSync(resolve(data, "eatwhat.sqlite"));
-db.exec(
-  "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS rooms (code TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL)",
-);
-const get = db.prepare("SELECT data FROM rooms WHERE code = ?");
-const save = db.prepare("INSERT OR REPLACE INTO rooms VALUES (?, ?, ?)");
 const fail = (status, message) => {
   throw Object.assign(new Error(message), { status });
 };
-function store(room) {
-  save.run(room.code, JSON.stringify(room), Date.now());
+async function store(client, room) {
+  await client.query(
+    `UPDATE ${roomsTable} SET data = $2, updated = $3 WHERE code = $1`,
+    [room.code, JSON.stringify(room), await roomTimestamp()],
+  );
 }
 function publicRoom(room, session) {
   const me = room.members.find((m) => m.id === session);
@@ -66,7 +61,9 @@ async function body(req) {
     fail(400, "Please send a valid request.");
   }
 }
-export const server = createServer(async (req, res) => {
+export const handler = async (req, res) => {
+  let client,
+    transaction = false;
   const send = (status, data) => {
     res.writeHead(status, {
       "Content-Type": "application/json",
@@ -105,24 +102,22 @@ export const server = createServer(async (req, res) => {
           cuisine = "Any",
           vegetarian = false,
         } = input;
-        if (!Number.isInteger(expected) || expected < 2 || expected > 10)
-          fail(400, "Choose 2–10 people.");
+        if (!Number.isSafeInteger(expected) || expected < 1)
+          fail(400, "Enter a whole number of people greater than zero.");
         if (
-          ![15, 20, 25, 35, 50].includes(budget) ||
-          ![1, 3, 5, 10].includes(distance) ||
+          !Number.isFinite(budget) ||
+          budget <= 0 ||
+          !Number.isFinite(distance) ||
+          distance <= 0 ||
           !["Any", "Indian", "Italian", "Asian", "American"].includes(
             cuisine,
           ) ||
           typeof vegetarian !== "boolean"
         )
           fail(400, "Choose valid meal filters.");
-        let code;
-        do {
-          code = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
-        } while (get.get(code));
         const filters = { budget, distance, cuisine, vegetarian };
         const room = {
-          code,
+          code: "",
           host: session,
           phase: "lobby",
           filters,
@@ -130,7 +125,15 @@ export const server = createServer(async (req, res) => {
           mealIds: filterMeals(filters).map((m) => m.id),
           members: [{ id: session, name, ready: false, votes: {} }],
         };
-        store(room);
+        // Retry code collisions without overwriting another room.
+        while (true) {
+          room.code = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+          const inserted = await db.query(
+            `INSERT INTO ${roomsTable} (code, data, updated) VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING`,
+            [room.code, JSON.stringify(room), await roomTimestamp()],
+          );
+          if (inserted.rowCount) break;
+        }
         return send(201, publicRoom(room, session));
       }
       const match = url.pathname.match(
@@ -141,16 +144,24 @@ export const server = createServer(async (req, res) => {
           404,
           "Room not found. Check the six-character code and try again.",
         );
-      // Finish asynchronous body reading before the synchronous read/modify/write.
-      // Otherwise concurrent participants can overwrite each other’s updates.
       const input = req.method === "POST" ? await body(req) : null;
-      const row = get.get(match[1]);
+      client = await db.connect();
+      await client.query("BEGIN");
+      transaction = true;
+      // Serialize room changes across server instances as well as requests.
+      const {
+        rows: [row],
+      } = await client.query(
+        `SELECT data FROM ${roomsTable} WHERE code = $1 FOR UPDATE`,
+        [match[1]],
+      );
       if (!row)
         fail(
           404,
           "Room not found. Check the six-character code and try again.",
         );
-      const room = JSON.parse(row.data),
+      const room =
+          typeof row.data === "string" ? JSON.parse(row.data) : row.data,
         action = match[2];
       if (!action && req.method === "GET")
         return send(200, publicRoom(room, session));
@@ -214,7 +225,9 @@ export const server = createServer(async (req, res) => {
           });
         } else fail(404, "Action not found.");
       }
-      store(room);
+      await store(client, room);
+      await client.query("COMMIT");
+      transaction = false;
       return send(200, publicRoom(room, session));
     }
     if (!["GET", "HEAD"].includes(req.method)) fail(405, "Method not allowed.");
@@ -246,13 +259,42 @@ export const server = createServer(async (req, res) => {
     });
     res.end(req.method === "HEAD" ? undefined : content);
   } catch (e) {
-    if (!e.status) console.error(e);
+    if (!e.status) console.error("Request failed (internal error).");
     send(e.status || 500, {
       error: e.status ? e.message : "Something went wrong. Please try again.",
     });
+  } finally {
+    if (client) {
+      try {
+        if (transaction) await client.query("ROLLBACK");
+      } catch {
+        client.release(true);
+        client = null;
+      } finally {
+        client?.release();
+      }
+    }
   }
-});
-if (process.env.NODE_ENV !== "test")
+};
+export const server = createServer(handler);
+server.on("close", () => db.end());
+const isMain =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain && process.env.NODE_ENV !== "test") {
+  try {
+    await db.query(`SELECT code FROM ${roomsTable} LIMIT 0`);
+  } catch (error) {
+    const code = /^[A-Z0-9_]+$/.test(error.code || "")
+      ? ` (${error.code})`
+      : "";
+    console.error(
+      `Database startup check failed${code}. Check DATABASE_URL and run npm run db:migrate.`,
+    );
+    await db.end();
+    process.exit(1);
+  }
   server.listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
     console.log(`EATWHAT running on port ${process.env.PORT || 3000}`),
   );
+}

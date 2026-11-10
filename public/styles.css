@@ -1566,3 +1566,13 @@ input.hidden {
 .little-star {
   color: var(--coral);
 }
+.room-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  margin-bottom: 24px;
+}
+.room-navigation .fine-print {
+  margin: 0;
+}

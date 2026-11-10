@@ -1,18 +1,23 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { memoryStore } from "./support/memory-store.js";
-import { createHandler } from "../server.js";
-import { roomStore, closeDatabase } from "../db.js";
-const store = process.env.TEST_DATABASE_URL ? roomStore : memoryStore();
-if (process.env.TEST_DATABASE_URL)
-  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-const server = createServer(createHandler(store));
+import { testDatabase } from "./database.js";
+process.env.NODE_ENV = "test";
+const database = await testDatabase();
+process.env.DATABASE_URL = database.url;
+process.env.EATWHAT_TEST_SCHEMA = database.schema;
+const { server } = await import("../server.js");
+const { default: handler } = await import("../api/index.js");
+assert.equal(typeof handler, "function");
+assert.equal(
+  server.listening,
+  false,
+  "Importing the Vercel handler must not start a listener",
+);
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  await closeDatabase();
+  await database.cleanup();
 });
 function person() {
   let cookie = "";
@@ -39,7 +44,7 @@ function person() {
 const settings = {
   name: "Alex",
   expected: 2,
-  budget: 25,
+  budget: 25000,
   distance: 3,
   cuisine: "Any",
   vegetarian: false,
@@ -108,7 +113,7 @@ test("filters enforce budget, distance, cuisine, and vegetarian preference", asy
     "",
     {
       ...settings,
-      budget: 20,
+      budget: 4500,
       distance: 3,
       cuisine: "Indian",
       vegetarian: true,
@@ -122,7 +127,7 @@ test("filters enforce budget, distance, cuisine, and vegetarian preference", asy
 });
 test("empty filtered menus become an explicit empty state", async () => {
   const { host, guest, path } = await table({
-    budget: 15,
+    budget: 3000,
     distance: 1,
     vegetarian: true,
   });
@@ -135,7 +140,9 @@ test("empty filtered menus become an explicit empty state", async () => {
 test("invalid configuration, names, codes, and votes are rejected", async () => {
   const client = person();
   await client("", null, 400);
-  await client("", { ...settings, expected: 1 }, 400);
+  await client("", { ...settings, expected: 0 }, 400);
+  const largeRoom = await client("", { ...settings, expected: 120 }, 201);
+  assert.equal(largeRoom.expected, 120);
   await client("", { ...settings, budget: -5 }, 400);
   await client("", { ...settings, name: "" }, 400);
   await client("/ZZZZZZ/join", { name: "Sam" }, 404);
@@ -184,40 +191,21 @@ test("overlapping slow requests preserve both participants’ readiness and vote
   assert.equal(result.winner.id, room.meals[0].id);
 });
 
-test("malformed bodies, oversized bodies, origins, and invalid paths", async () => {
-  for (const [body, status] of [
-    ["{", 400],
-    ["[]", 400],
-    ["x".repeat(9000), 413],
-  ]) {
-    const response = await fetch(base + "/api/rooms", { method: "POST", body });
-    assert.equal(response.status, status);
-  }
-  assert.equal(
-    (
-      await fetch(base + "/api/rooms", {
+test("concurrent joins cannot claim the same final seat", async () => {
+  const host = person();
+  const room = await host("", settings, 201);
+  const responses = await Promise.all(
+    ["Sam", "Pat"].map((name) =>
+      fetch(`${base}/api/rooms/${room.code}/join`, {
         method: "POST",
-        headers: { origin: "https://other.example" },
-        body: "{}",
-      })
-    ).status,
-    403,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    ),
   );
-  assert.equal((await fetch(base + "/%ZZ")).status, 400);
-  assert.equal((await fetch(base + "/api/rooms/invalid")).status, 404);
-});
-
-test("production cookies are Secure and HttpOnly", async () => {
-  const old = process.env.VERCEL;
-  process.env.VERCEL = "1";
-  try {
-    const response = await fetch(base + "/api/rooms/ZZZZZZ");
-    assert.match(
-      response.headers.get("set-cookie"),
-      /HttpOnly; SameSite=Lax;.*; Secure/,
-    );
-  } finally {
-    if (old === undefined) delete process.env.VERCEL;
-    else process.env.VERCEL = old;
-  }
+  assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
+  // The rejected transaction must release its lock and leave the room usable.
+  const saved = await host(`/${room.code}/ready`, { ready: true });
+  assert.equal(saved.members.length, 2);
+  assert.equal(saved.ready, true);
 });

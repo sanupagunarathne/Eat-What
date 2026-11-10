@@ -1,10 +1,4 @@
-import { test } from "node:test";
-if (process.env.TEST_DATABASE_URL) {
-  await import("./rooms.test.js");
-} else {
-  test(
-    "PostgreSQL integration (set TEST_DATABASE_URL to an initialized test database)",
-    { skip: true },
-    () => {},
-  );
-}
+// Run the same room behavior checks against the original PostgreSQL schema.
+// Node's test runner isolates this worker from the JSONB schema tests.
+process.env.EATWHAT_TEST_LEGACY_ROOMS = "true";
+await import("./rooms.test.js");
